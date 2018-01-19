@@ -4,25 +4,93 @@ from utils import S, norm_non0
 __author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
 
 
-class SGL:
-    def __init__(self, groups, alpha, lbda, ind_sparse, max_iter_outer=10000, max_iter_inner=100, rtol=1e-6):
+class SGL(object):
+    """A Semi-Sparse Group Lasso model using a blockwise descent solver
+
+    Implements the methods presented by Noah Simon et. al [1], adding the
+    notion of the semi-sparse model, as introduced by Romain Tavenard [2].
+
+    Attributes
+    ----------
+    ind_sparse : numpy.ndarray
+    groups : numpy.ndarray
+
+    alpha : float
+        alpha paramater provided to constructor
+    lambda_ : float
+        lambda_ parameter provided to constructor
+    max_iter_outer : int
+        max_iter_outer parameter provided to constructor
+    max_iter_inner : int
+        max_iter_inner parameter provided to constructor
+    rtol : float
+        rtol parameter provided to constructor
+    coef_ : None
+
+    .. [1] Noah Simon, Jerome Friedman, Trevor Hastie, Rob Tibshirani,
+    "A Sparse-group Lasso," Journal of Computational and Graphical Statistics,
+    Vol 22, Issue 2 (2013),
+    <http://www.stanford.edu/~hastie/Papers/SGLpaper.pdf>
+
+    .. [2] Romain Tavenard, Sparse-Group Lasso jupyter notebook, Nov 30, 2016
+    <https://github.com/rtavenar/Homework/blob/master/pynb/sparse_group_lasso.ipynb>
+
+    See Also
+    --------
+    subgradients_semisparse : same model, different solver
+    """
+    def __init__(self, groups, alpha, lambda_, ind_sparse,
+                 max_iter_outer=10000, max_iter_inner=100, rtol=1e-6):
+        """
+        Parameters
+        ----------
+        groups : array-like
+
+        alpha : float
+
+        lambda_ : float
+
+        ind_sparse : array-like
+
+        max_iter_outer : int, optional
+            Default: 10000
+
+        max_iter_inner : int, optional
+            Default: 100
+
+        rtol : float, optional
+            Default: 1e-6
+        """
         self.ind_sparse = numpy.array(ind_sparse)
         self.groups = numpy.array(groups)
         self.alpha = alpha
-        self.lbda = lbda
+        self.lambda_ = lambda_
         self.max_iter_outer = max_iter_outer
         self.max_iter_inner = max_iter_inner
         self.rtol = rtol
         self.coef_ = None
 
     def fit(self, X, y):
+        """Fit this SGL model using features X and output y
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Feature matrix used to train this SGL model. Dimensions are n x p,
+            where n is the number of samples and p is the number of features
+
+        y : numpy.ndarray
+            Response vector used to train this SGL model. Length is n,
+            where n is the number of samples.
+        """
         # Assumption: group ids are between 0 and max(groups)
-        # Other assumption: ind_sparse is of dimension X.shape[1] and has 0 if the dimension should not be pushed
+        # Other assumption: ind_sparse is of dimension X.shape[1] and has 0 if
+        # the dimension should not be pushed
         # towards sparsity and 1 otherwise
         n_groups = numpy.max(self.groups) + 1
         n, d = X.shape
         assert d == self.ind_sparse.shape[0]
-        alpha_lambda = self.alpha * self.lbda * self.ind_sparse
+        alpha_lambda = self.alpha * self.lambda_ * self.ind_sparse
         self.coef_ = numpy.random.randn(d)
         t = n / (numpy.linalg.norm(X, 2) ** 2)  # Adaptation of the heuristic (?) from fabianp's code
         for iter_outer in range(self.max_iter_outer):
@@ -39,7 +107,7 @@ class SGL:
                     for iter_inner in range(self.max_iter_inner):
                         grad_l = self._grad_l(X, y, indices_group_k)
                         tmp = S(beta_k - t * grad_l, t * alpha_lambda[indices_group_k])
-                        tmp *= numpy.maximum(1. - t * (1 - self.alpha) * self.lbda * p_l / numpy.linalg.norm(tmp), 0.)
+                        tmp *= numpy.maximum(1. - t * (1 - self.alpha) * self.lambda_ * p_l / numpy.linalg.norm(tmp), 0.)
                         if numpy.linalg.norm(tmp - beta_k) / norm_non0(tmp) < self.rtol:
                             self.coef_[indices_group_k] = tmp
                             break
@@ -71,22 +139,22 @@ class SGL:
         return numpy.linalg.norm(y - numpy.dot(X, self.coef_)) ** 2 / (2 * n)
 
     def loss(self, X, y):
-        alpha_lambda = self.alpha * self.lbda * self.ind_sparse
+        alpha_lambda = self.alpha * self.lambda_ * self.ind_sparse
         reg_l1 = numpy.linalg.norm(alpha_lambda * self.coef_, ord=1)
         s = 0
         n_groups = numpy.max(self.groups) + 1
         for gr in range(n_groups):
             indices_group_k = self.groups == gr
             s += numpy.sqrt(numpy.sum(indices_group_k)) * numpy.linalg.norm(self.coef_[indices_group_k])
-        reg_l2 = (1. - self.alpha) * self.lbda * s
+        reg_l2 = (1. - self.alpha) * self.lambda_ * s
         #print(reg_l1, reg_l2, self.unregularized_loss(X, y))
         return self.unregularized_loss(X, y) + reg_l2 + reg_l1
 
     def discard_group(self, X, y, ind):
-        alpha_lambda = self.alpha * self.lbda * self.ind_sparse
+        alpha_lambda = self.alpha * self.lambda_ * self.ind_sparse
         norm_2 = numpy.linalg.norm(S(self._grad_l(X, y, ind, group_zero=True), alpha_lambda[ind]))
         p_l = numpy.sqrt(numpy.sum(ind))
-        return norm_2 <= (1 - self.alpha) * self.lbda * p_l
+        return norm_2 <= (1 - self.alpha) * self.lambda_ * p_l
 
     def predict(self, X):
         return numpy.dot(X, self.coef_)
@@ -203,7 +271,7 @@ if __name__ == "__main__":
     lambda_max = SGL.lambda_max(X, y, groups=groups, alpha=alpha, ind_sparse=ind_sparse)
     print(lambda_max)
     for l in [lambda_max - epsilon, lambda_max + epsilon]:
-        model = SGL(groups=groups, alpha=alpha, lbda=l, ind_sparse=ind_sparse)
+        model = SGL(groups=groups, alpha=alpha, lambda_=l, ind_sparse=ind_sparse)
         model.fit(X, y)
         print(l, model.coef_)
 
