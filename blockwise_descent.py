@@ -1,10 +1,13 @@
+from __future__ import absolute_import, division, print_function
+
 import numpy
-import blockwise_descent_semisparse
+from .blockwise_descent_semisparse import SGL as SSGL
+from .blockwise_descent_semisparse import SGL_LogisticRegression as SSGL_LogisticRegression
 
 __author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
 
 
-class SGL(blockwise_descent_semisparse.SGL):
+class SGL(SSGL):
     """A purely sparse group lasso model using a blockwise descent solver
 
     Inherits from the semi-sparse version and converts to a fully sparse model
@@ -28,7 +31,7 @@ class SGL(blockwise_descent_semisparse.SGL):
         self.coef_ = None
 
 
-class SGL_LogisticRegression(blockwise_descent_semisparse.SGL_LogisticRegression):
+class SGL_LogisticRegression(SSGL_LogisticRegression):
     """A purely sparse group lasso model using a blockwise descent solver
 
     Inherits from the semi-sparse version and converts to a fully sparse model

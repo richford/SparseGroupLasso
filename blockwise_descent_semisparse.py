@@ -1,5 +1,9 @@
+from __future__ import absolute_import, division, print_function
+
 import numpy
-from utils import S, norm_non0
+from sklearn.base import BaseEstimator
+
+from .utils import S, norm_non0
 
 __author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
 
