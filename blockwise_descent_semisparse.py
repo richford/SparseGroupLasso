@@ -45,7 +45,7 @@ class SGL(BaseEstimator):
     """
     def __init__(self, groups, alpha, lambda_, ind_sparse,
                  max_iter_outer=10000, max_iter_inner=100, rtol=1e-6,
-                 warm_start=False, warm_start_coef=None):
+                 warm_start=False):
         """
         Parameters
         ----------
@@ -65,6 +65,10 @@ class SGL(BaseEstimator):
 
         rtol : float, optional
             Default: 1e-6
+
+        warm_start : boolean, optional
+            If True, use previous value of `coef_` as starting point to fit new data
+            Default: False
         """
         self.ind_sparse = numpy.array(ind_sparse)
         self.groups = numpy.array(groups)
@@ -74,7 +78,6 @@ class SGL(BaseEstimator):
         self.max_iter_inner = max_iter_inner
         self.rtol = rtol
         self.warm_start = warm_start
-        self.warm_start_coef = warm_start_coef
         self.coef_ = None
 
     def fit(self, X, y):
@@ -98,9 +101,7 @@ class SGL(BaseEstimator):
         n, d = X.shape
         assert d == self.ind_sparse.shape[0]
         alpha_lambda = self.alpha * self.lambda_ * self.ind_sparse
-        if self.warm_start:
-            self.coef_ = self.warm_start_coef
-        else:
+        if not self.warm_start or self.coef_ is None:
             self.coef_ = numpy.random.randn(d)
         t = n / (numpy.linalg.norm(X, 2) ** 2)  # Adaptation of the heuristic (?) from fabianp's code
         for iter_outer in range(self.max_iter_outer):

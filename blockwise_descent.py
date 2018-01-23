@@ -20,7 +20,8 @@ class SGL(SSGL):
     --------
     blockwise_descent_semisparse.SGL : The semi-sparse version
     """
-    def __init__(self, groups, alpha, lambda_, max_iter_outer=10000, max_iter_inner=100, rtol=1e-6):
+    def __init__(self, groups, alpha, lambda_, max_iter_outer=10000, max_iter_inner=100, rtol=1e-6,
+                 warm_start=False):
         self.ind_sparse = numpy.ones((len(groups), ))
         self.groups = numpy.array(groups)
         self.alpha = alpha
@@ -28,6 +29,7 @@ class SGL(SSGL):
         self.max_iter_outer = max_iter_outer
         self.max_iter_inner = max_iter_inner
         self.rtol = rtol
+        self.warm_start = warm_start
         self.coef_ = None
 
 
@@ -44,7 +46,8 @@ class SGL_LogisticRegression(SSGL_LogisticRegression):
     --------
     blockwise_descent_semisparse.SGL_LogisticRegression : The semi-sparse version
     """
-    def __init__(self, groups, alpha, lambda_, max_iter_outer=10000, max_iter_inner=100, rtol=1e-6):
+    def __init__(self, groups, alpha, lambda_, max_iter_outer=10000, max_iter_inner=100, rtol=1e-6,
+                 warm_start=False):
         self.ind_sparse = numpy.ones((len(groups), ))
         self.groups = numpy.array(groups)
         self.alpha = alpha
@@ -52,5 +55,6 @@ class SGL_LogisticRegression(SSGL_LogisticRegression):
         self.max_iter_outer = max_iter_outer
         self.max_iter_inner = max_iter_inner
         self.rtol = rtol
+        self.warm_start = warm_start
         self.coef_ = None
 

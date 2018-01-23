@@ -20,10 +20,10 @@ for i in range(d):
 
 y = numpy.dot(X, secret_beta)
 
-#model = subgradients.SGL(groups=groups, alpha=0., lbda=0.1)
-#model = subgradients_semisparse.SGL(groups=groups, alpha=0.1, lbda=0.1, ind_sparse=ind_sparse)
-#model = blockwise_descent.SGL(groups=groups, alpha=0., lbda=0.1)
-model = blockwise_descent_semisparse.SGL(groups=groups, alpha=alpha, lbda=lbda, ind_sparse=ind_sparse)
+#model = subgradients.SGL(groups=groups, alpha=0., lambda_=0.1)
+#model = subgradients_semisparse.SGL(groups=groups, alpha=0.1, lambda_=0.1, ind_sparse=ind_sparse)
+#model = blockwise_descent.SGL(groups=groups, alpha=0., lambda_=0.1)
+model = blockwise_descent_semisparse.SGL(groups=groups, alpha=alpha, lambda_=lbda, ind_sparse=ind_sparse)
 
 model.fit(X, y)
 beta_hat = model.coef_
