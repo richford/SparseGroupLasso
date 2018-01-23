@@ -4,7 +4,7 @@ from utils import S, norm_non0
 __author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
 
 
-class SGL(object):
+class SGL(BaseEstimator):
     """A Semi-Sparse Group Lasso model using a blockwise descent solver
 
     Implements the methods presented by Noah Simon et. al [1], adding the
@@ -40,7 +40,8 @@ class SGL(object):
     subgradients_semisparse : same model, different solver
     """
     def __init__(self, groups, alpha, lambda_, ind_sparse,
-                 max_iter_outer=10000, max_iter_inner=100, rtol=1e-6):
+                 max_iter_outer=10000, max_iter_inner=100, rtol=1e-6,
+                 warm_start=False, warm_start_coef=None):
         """
         Parameters
         ----------
@@ -68,6 +69,8 @@ class SGL(object):
         self.max_iter_outer = max_iter_outer
         self.max_iter_inner = max_iter_inner
         self.rtol = rtol
+        self.warm_start = warm_start
+        self.warm_start_coef = warm_start_coef
         self.coef_ = None
 
     def fit(self, X, y):
@@ -91,7 +94,10 @@ class SGL(object):
         n, d = X.shape
         assert d == self.ind_sparse.shape[0]
         alpha_lambda = self.alpha * self.lambda_ * self.ind_sparse
-        self.coef_ = numpy.random.randn(d)
+        if self.warm_start:
+            self.coef_ = self.warm_start_coef
+        else:
+            self.coef_ = numpy.random.randn(d)
         t = n / (numpy.linalg.norm(X, 2) ** 2)  # Adaptation of the heuristic (?) from fabianp's code
         for iter_outer in range(self.max_iter_outer):
             beta_old = self.coef_.copy()
@@ -135,10 +141,24 @@ class SGL(object):
         return - numpy.dot(X[:, indices_group].T, r) / n
 
     def unregularized_loss(self, X, y):
+        """The unregularized loss function (i.e. RSS)
+
+        Returns
+        -------
+        np.float64
+            The unregularized loss
+        """
         n, d = X.shape
         return numpy.linalg.norm(y - numpy.dot(X, self.coef_)) ** 2 / (2 * n)
 
     def loss(self, X, y):
+        """Total loss function with regularization
+
+        Returns
+        -------
+        np.float64
+            The regularized loss
+        """
         alpha_lambda = self.alpha * self.lambda_ * self.ind_sparse
         reg_l1 = numpy.linalg.norm(alpha_lambda * self.coef_, ord=1)
         s = 0
@@ -151,15 +171,65 @@ class SGL(object):
         return self.unregularized_loss(X, y) + reg_l2 + reg_l1
 
     def discard_group(self, X, y, ind):
+        """
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Feature matrix used to train this SGL model. Dimensions are n x p,
+            where n is the number of samples and p is the number of features
+
+        y : numpy.ndarray
+            Response vector used to train this SGL model. Length is n,
+            where n is the number of samples.
+
+        ind : boolean numpy.ndarray
+            boolean mask for this groups indices
+
+        Returns
+        -------
+        boolean
+            If true, indicates that the coefficients for this group should
+            be discarded.
+        """
         alpha_lambda = self.alpha * self.lambda_ * self.ind_sparse
         norm_2 = numpy.linalg.norm(S(self._grad_l(X, y, ind, group_zero=True), alpha_lambda[ind]))
         p_l = numpy.sqrt(numpy.sum(ind))
         return norm_2 <= (1 - self.alpha) * self.lambda_ * p_l
 
     def predict(self, X):
+        """Predict response vector using the trained coefficients
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Feature matrix used to train this SGL model. Dimensions are n x p,
+            where n is the number of samples and p is the number of features
+
+        Returns
+        -------
+        yhat : numpy.ndarray
+            Predicted response vector of length n
+        """
         return numpy.dot(X, self.coef_)
 
     def fit_predict(self, X, y):
+        """Fit the model and predict the response vector
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Feature matrix used to train this SGL model. Dimensions are n x p,
+            where n is the number of samples and p is the number of features
+
+        y : numpy.ndarray
+            Response vector used to train this SGL model. Length is n,
+            where n is the number of samples.
+
+        Returns
+        -------
+        yhat : numpy.ndarray
+            Predicted response vector of length n
+        """
         return self.fit(X, y).predict(X)
 
     @classmethod
