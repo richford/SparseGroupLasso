@@ -1,9 +1,6 @@
 import numpy
 from SparseGroupLasso.utils import S, norm_non0, discard_group
 
-__author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
-
-
 class SSGL_subgrad:
     def __init__(self, groups, alpha, lambda_, ind_sparse, max_iter=10000,
                  rtol=1e-6):

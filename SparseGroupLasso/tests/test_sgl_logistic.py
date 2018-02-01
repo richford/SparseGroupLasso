@@ -1,7 +1,6 @@
 import numpy
 from SparseGroupLasso import SSGL_LogisticRegression
 
-__author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
 
 def test_sgl_logistic():
     n = 1000
