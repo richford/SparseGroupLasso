@@ -1,11 +1,12 @@
 import numpy
-from utils import S, norm_non0, discard_group
+from SparseGroupLasso.utils import S, norm_non0, discard_group
 
 __author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
 
 
-class SGL:
-    def __init__(self, groups, alpha, lambda_, ind_sparse, max_iter=10000, rtol=1e-6):
+class SSGL_subgrad:
+    def __init__(self, groups, alpha, lambda_, ind_sparse, max_iter=10000,
+                 rtol=1e-6):
         self.ind_sparse = numpy.array(ind_sparse)
         self.groups = numpy.array(groups)
         self.alpha = alpha

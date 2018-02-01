@@ -1,10 +1,10 @@
 import numpy
-import subgradients_semisparse
+from SparseGroupLasso.subgradients_semisparse import SSGL_subgrad
 
 __author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
 
 
-class SGL(subgradients_semisparse.SGL):
+class SGL_subgrad(SSGL_subgrad):
     """A purely sparse group lasso model using a subgradient solver
 
     Inherits from the semi-sparse version and converts to a fully sparse model

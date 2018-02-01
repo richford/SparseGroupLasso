@@ -8,7 +8,7 @@ from .utils import S, norm_non0
 __author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
 
 
-class SGL(BaseEstimator):
+class SSGL(BaseEstimator):
     """A Semi-Sparse Group Lasso model using a blockwise descent solver
 
     Implements the methods presented by Noah Simon et. al [1], adding the
@@ -282,7 +282,7 @@ class SGL(BaseEstimator):
         return numpy.logspace(numpy.log10(lambda_min_ratio * l_max), numpy.log10(l_max), num=n_lambdas)
 
 
-class SGL_LogisticRegression(SGL):
+class SSGL_LogisticRegression(SSGL):
     # Up to now, we assume that y is 0 or 1
     def unregularized_loss(self, X, y):  # = -1/n * log-likelihood
         n, d = X.shape
