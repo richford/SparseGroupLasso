@@ -3,7 +3,6 @@ from cython.parallel import prange
 from libc.math cimport sqrt
 
 import numpy as np
-from scipy.linalg.blas import ddot
 cimport numpy as cnp
 
 
