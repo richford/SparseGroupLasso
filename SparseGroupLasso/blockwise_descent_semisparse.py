@@ -2,6 +2,7 @@ from __future__ import absolute_import, division, print_function
 
 import numpy as np
 from sklearn.base import BaseEstimator
+from numba import jit
 
 from .utils import S, norm_non0
 
@@ -80,6 +81,7 @@ class SSGL(BaseEstimator):
         self.warm_start = warm_start
         self.coef_ = None
 
+
     def fit(self, X, y):
         """Fit this SGL model using features X and output y
 
@@ -111,7 +113,8 @@ class SSGL(BaseEstimator):
             for gr in range(n_groups):
                 # 1- Should the group be zero-ed out?
                 indices_group_k = self.groups == gr
-                if self.discard_group(X, y, indices_group_k):
+                X_group_t = X[:, indices_group_k].T
+                if self.discard_group(X, X_group_t, y, indices_group_k):
                     self.coef_[indices_group_k] = 0.
                 else:
                     # 2- If the group is not zero-ed out,
@@ -119,26 +122,31 @@ class SSGL(BaseEstimator):
                     beta_k = self.coef_[indices_group_k]
                     p_l = np.sqrt(np.sum(indices_group_k))
                     for iter_inner in range(self.max_iter_inner):
-                        grad_l = self._grad_l(X, y, indices_group_k)
+                        grad_l = self._grad_l(
+                            X, X_group_t, y, indices_group_k)
                         tmp = S(beta_k - t * grad_l, t *
                                 alpha_lambda[indices_group_k])
-                        norm_tmp = np.linalg.norm(tmp)
+                        norm_tmp = np.sqrt(np.dot(tmp, tmp))
                         # Equation 12 in Simon paper:
                         step = (1. -
                                 (t * (1 - self.alpha) * self.lambda_ * p_l /
                                  norm_tmp))
                         tmp *= np.maximum(step, 0.)
-                        if ((np.linalg.norm(tmp - beta_k) /
-                             norm_non0(tmp)) < self.rtol):
+                        tmp_beta_k = tmp - beta_k
+                        norm_tmp_beta_k = np.sqrt(np.dot(tmp_beta_k,
+                                                         tmp_beta_k))
+                        norm_non0_tmp = norm_non0(tmp)
+                        if norm_tmp_beta_k / norm_non0_tmp < self.rtol:
                             self.coef_[indices_group_k] = tmp
                             break
                         beta_k = self.coef_[indices_group_k] = tmp
-            if ((np.linalg.norm(beta_old - self.coef_) /
+            beta_old_coef = beta_old - self.coef_
+            if ((np.sqrt(np.dot(beta_old_coef, beta_old_coef)) /
                  norm_non0(self.coef_)) < self.rtol):
                 break
         return self
 
-    def _grad_l(self, X, y, indices_group, group_zero=False):
+    def _grad_l(self, X, X_group_t, y, indices_group, group_zero=False):
         if group_zero:
             beta = self.coef_.copy()
             beta[indices_group] = 0.
@@ -146,7 +154,7 @@ class SSGL(BaseEstimator):
             beta = self.coef_
         n, d = X.shape
         r = y - np.dot(X, beta)
-        return - np.dot(X[:, indices_group].T, r) / n
+        return -np.dot(X_group_t, r) / n
 
     @staticmethod
     def _static_grad_l(X, y, indices_group, beta=None):
@@ -154,7 +162,8 @@ class SSGL(BaseEstimator):
         if beta is None:
             beta = np.zeros((d, ))
         r = y - np.dot(X, beta)
-        return - np.dot(X[:, indices_group].T, r) / n
+        X_group_T = X[:, indices_group].T
+        return -np.dot(X_group_T, r) / n
 
     def unregularized_loss(self, X, y):
         """The unregularized loss function (i.e. RSS)
@@ -165,7 +174,8 @@ class SSGL(BaseEstimator):
             The unregularized loss
         """
         n, d = X.shape
-        return np.linalg.norm(y - np.dot(X, self.coef_)) ** 2 / (2 * n)
+        r = y - np.dot(X, self.coef_)
+        return np.dot(r, r) / (2 * n)
 
     def loss(self, X, y):
         """Total loss function with regularization
@@ -181,12 +191,13 @@ class SSGL(BaseEstimator):
         n_groups = np.max(self.groups) + 1
         for gr in range(n_groups):
             indices_group_k = self.groups == gr
-            s += np.sqrt(np.sum(indices_group_k)) * np.linalg.norm(self.coef_[indices_group_k])
+            s += np.sqrt(np.sum(indices_group_k)) * np.sqrt(np.dot(self.coef_[indices_group_k],
+                           self.coef_[indices_group_k]))
         reg_l2 = (1. - self.alpha) * self.lambda_ * s
         #print(reg_l1, reg_l2, self.unregularized_loss(X, y))
         return self.unregularized_loss(X, y) + reg_l2 + reg_l1
 
-    def discard_group(self, X, y, ind):
+    def discard_group(self, X, X_group_t, y, ind):
         """
         Parameters
         ----------
@@ -208,8 +219,9 @@ class SSGL(BaseEstimator):
             be discarded.
         """
         alpha_lambda = self.alpha * self.lambda_ * self.ind_sparse
-        norm_2 = np.linalg.norm(S(self._grad_l(X, y, ind, group_zero=True),
-                                alpha_lambda[ind]))
+        grad_l = self._grad_l(X, X_group_t, y, ind, group_zero=True)
+        this_S = S(grad_l, alpha_lambda[ind])
+        norm_2 = np.sqrt(np.dot(this_S, this_S))
         p_l = np.sqrt(np.sum(ind))
         return norm_2 <= (1 - self.alpha) * self.lambda_ * p_l
 
@@ -303,7 +315,8 @@ class SSGL_LogisticRegression(SSGL):
         log_1_e_xb = np.log(1. + np.exp(x_beta))
         return np.sum(log_1_e_xb - y_x_beta, axis=0) / n
 
-    def _grad_l(self, X, y, indices_group, group_zero=False, beta_zero=False):
+    def _grad_l(self, X, X_group_t, y, indices_group, group_zero=False,
+                beta_zero=False):
         if beta_zero:
             beta = np.zeros(self.coef_.shape)
         elif group_zero:
@@ -314,7 +327,7 @@ class SSGL_LogisticRegression(SSGL):
         n, d = X.shape
         exp_xb = np.exp(np.dot(X, beta))
         ratio = exp_xb / (1. + exp_xb)
-        return np.sum(X[:, indices_group] * (ratio - y).reshape((n, 1)), axis=0) / n
+        return np.sum(X_group_t.T * (ratio - y).reshape((n, 1)), axis=0) / n
 
     @staticmethod
     def _static_grad_l(X, y, indices_group, beta=None):
