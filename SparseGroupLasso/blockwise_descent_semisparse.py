@@ -114,7 +114,9 @@ class SSGL(BaseEstimator):
                 # 1- Should the group be zero-ed out?
                 indices_group_k = self.groups == gr
                 X_group_t = X[:, indices_group_k].T
-                if self.discard_group(X, X_group_t, y, indices_group_k):
+                grad_l = self._grad_l(X, X_group_t, y, indices_group_k,
+                                      group_zero=True)
+                if self.discard_group(grad_l, indices_group_k):
                     self.coef_[indices_group_k] = 0.
                 else:
                     # 2- If the group is not zero-ed out,
@@ -146,6 +148,7 @@ class SSGL(BaseEstimator):
                 break
         return self
 
+    #@jit
     def _grad_l(self, X, X_group_t, y, indices_group, group_zero=False):
         if group_zero:
             beta = self.coef_.copy()
@@ -157,13 +160,12 @@ class SSGL(BaseEstimator):
         return -np.dot(X_group_t, r) / n
 
     @staticmethod
-    def _static_grad_l(X, y, indices_group, beta=None):
+    def _static_grad_l(X, X_group_t, y, indices_group, beta=None):
         n, d = X.shape
         if beta is None:
             beta = np.zeros((d, ))
         r = y - np.dot(X, beta)
-        X_group_T = X[:, indices_group].T
-        return -np.dot(X_group_T, r) / n
+        return -np.dot(X_group_t, r) / n
 
     def unregularized_loss(self, X, y):
         """The unregularized loss function (i.e. RSS)
@@ -197,7 +199,8 @@ class SSGL(BaseEstimator):
         #print(reg_l1, reg_l2, self.unregularized_loss(X, y))
         return self.unregularized_loss(X, y) + reg_l2 + reg_l1
 
-    def discard_group(self, X, X_group_t, y, ind):
+
+    def discard_group(self, grad_l, ind):
         """
         Parameters
         ----------
@@ -219,7 +222,6 @@ class SSGL(BaseEstimator):
             be discarded.
         """
         alpha_lambda = self.alpha * self.lambda_ * self.ind_sparse
-        grad_l = self._grad_l(X, X_group_t, y, ind, group_zero=True)
         this_S = S(grad_l, alpha_lambda[ind])
         norm_2 = np.sqrt(np.dot(this_S, this_S))
         p_l = np.sqrt(np.sum(ind))
@@ -271,7 +273,8 @@ class SSGL(BaseEstimator):
         for gr in range(n_groups):
             indices_group = groups == gr
             sqrt_p_l = np.sqrt(np.sum(indices_group))
-            vec_A = np.abs(cls._static_grad_l(X, y, indices_group))
+            X_group_t = X[:, indices_group].T
+            vec_A = np.abs(cls._static_grad_l(X, X_group_t, y, indices_group))
             if alpha > 0.:
                 min_lambda = np.inf
                 breakpoints_lambda = np.unique(vec_A / alpha)
@@ -330,14 +333,15 @@ class SSGL_LogisticRegression(SSGL):
         return np.sum(X_group_t.T * (ratio - y).reshape((n, 1)), axis=0) / n
 
     @staticmethod
-    def _static_grad_l(X, y, indices_group, beta=None):
+    def _static_grad_l(X, X_group_t, y, indices_group, beta=None):
         n, d = X.shape
         if beta is None:
             ratio = .5
         else:
             exp_xb = np.exp(np.dot(X, beta))
             ratio = exp_xb / (1. + exp_xb)
-        return np.sum(X[:, indices_group] * (ratio - y).reshape((n, 1)), axis=0) / n
+        return np.sum(X_group_t.T * (ratio - y).reshape((n, 1)),
+                      axis=0) / n
 
     def predict(self, X):
         y = np.ones((X.shape[0]))
