@@ -2,7 +2,7 @@ from __future__ import absolute_import, division, print_function
 
 import numpy as np
 from sklearn.base import BaseEstimator
-from numba import jit
+from SparseGroupLasso.linalg import vec_norm, dot
 
 from .utils import S, norm_non0
 
@@ -81,7 +81,6 @@ class SSGL(BaseEstimator):
         self.warm_start = warm_start
         self.coef_ = None
 
-
     def fit(self, X, y):
         """Fit this SGL model using features X and output y
 
@@ -128,27 +127,25 @@ class SSGL(BaseEstimator):
                             X, X_group_t, y, indices_group_k)
                         tmp = S(beta_k - t * grad_l, t *
                                 alpha_lambda[indices_group_k])
-                        norm_tmp = np.sqrt(np.dot(tmp, tmp))
+                        norm_tmp = vec_norm(tmp)
                         # Equation 12 in Simon paper:
                         step = (1. -
                                 (t * (1 - self.alpha) * self.lambda_ * p_l /
                                  norm_tmp))
-                        tmp *= np.maximum(step, 0.)
+                        tmp *= max([step, 0.])
                         tmp_beta_k = tmp - beta_k
-                        norm_tmp_beta_k = np.sqrt(np.dot(tmp_beta_k,
-                                                         tmp_beta_k))
+                        norm_tmp_beta_k = vec_norm(tmp_beta_k)
                         norm_non0_tmp = norm_non0(tmp)
                         if norm_tmp_beta_k / norm_non0_tmp < self.rtol:
                             self.coef_[indices_group_k] = tmp
                             break
                         beta_k = self.coef_[indices_group_k] = tmp
             beta_old_coef = beta_old - self.coef_
-            if ((np.sqrt(np.dot(beta_old_coef, beta_old_coef)) /
-                 norm_non0(self.coef_)) < self.rtol):
+            if (vec_norm(beta_old_coef) / norm_non0(self.coef_) < self.rtol):
                 break
         return self
 
-    #@jit
+
     def _grad_l(self, X, X_group_t, y, indices_group, group_zero=False):
         if group_zero:
             beta = self.coef_.copy()
@@ -193,8 +190,8 @@ class SSGL(BaseEstimator):
         n_groups = np.max(self.groups) + 1
         for gr in range(n_groups):
             indices_group_k = self.groups == gr
-            s += np.sqrt(np.sum(indices_group_k)) * np.sqrt(np.dot(self.coef_[indices_group_k],
-                           self.coef_[indices_group_k]))
+            s += (np.sqrt(np.sum(indices_group_k)) *
+                  vec_norm(self.coef_[indices_group_k]))
         reg_l2 = (1. - self.alpha) * self.lambda_ * s
         #print(reg_l1, reg_l2, self.unregularized_loss(X, y))
         return self.unregularized_loss(X, y) + reg_l2 + reg_l1
@@ -223,12 +220,12 @@ class SSGL(BaseEstimator):
         """
         alpha_lambda = self.alpha * self.lambda_ * self.ind_sparse
         this_S = S(grad_l, alpha_lambda[ind])
-        norm_2 = np.sqrt(np.dot(this_S, this_S))
+        norm_2 = vec_norm(this_S)
         p_l = np.sqrt(np.sum(ind))
         return norm_2 <= (1 - self.alpha) * self.lambda_ * p_l
 
     def predict(self, X):
-        """Predict response vector using the trained coefficients
+        """Predict response vector using the trained coefficients.
 
         Parameters
         ----------
