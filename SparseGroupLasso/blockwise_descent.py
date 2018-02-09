@@ -1,8 +1,8 @@
 from __future__ import absolute_import, division, print_function
 
 import numpy
-from .blockwise_descent_semisparse import SGL as SSGL
-from .blockwise_descent_semisparse import SGL_LogisticRegression as SSGL_LogisticRegression
+from .blockwise_descent_semisparse import SSGL
+from .blockwise_descent_semisparse import SSGL_LogisticRegression
 
 __author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
 
@@ -20,7 +20,9 @@ class SGL(SSGL):
     --------
     blockwise_descent_semisparse.SGL : The semi-sparse version
     """
-    def __init__(self, groups, alpha, lambda_, max_iter_outer=10000, max_iter_inner=100, rtol=1e-6,
+    def __init__(self, groups, alpha, lambda_,
+                 max_iter_outer=10000,
+                 max_iter_inner=100, rtol=1e-6,
                  warm_start=False):
         self.ind_sparse = numpy.ones((len(groups), ))
         self.groups = numpy.array(groups)
@@ -57,4 +59,3 @@ class SGL_LogisticRegression(SSGL_LogisticRegression):
         self.rtol = rtol
         self.warm_start = warm_start
         self.coef_ = None
-
